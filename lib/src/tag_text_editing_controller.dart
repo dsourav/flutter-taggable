@@ -41,6 +41,19 @@ class TagTextEditingController<T> extends TextEditingController {
   void clear() {
     _tagBackendFormatsToTaggables = {};
     super.clear();
+    _updateVisibleText();
+  }
+
+  @override
+  set text(String newText) {
+    super.text = newText;
+    _updateVisibleText();
+  }
+
+  @override
+  set value(TextEditingValue newValue) {
+    super.value = newValue;
+    _updateVisibleText();
   }
 
   /// A listener that triggers all tagging-related listeners.
@@ -83,12 +96,33 @@ class TagTextEditingController<T> extends TextEditingController {
   /// The cursor position before the last change. Used for intuitive cursor movement.
   int _previousCursorPosition = 0;
 
+  /// Cached copy of what the user actually sees in the field. This value is
+  /// updated whenever the controller's `text` or `value` setter is invoked.
+  String _visibleText = '';
+
   /// The text formatted in backend format. Do not use `controller.text` directly.
   String get textInBackendFormat => text.replaceAll(spaceMarker, '');
 
+  /// The plain-text version of the field, exactly as the user would read it
+  /// in the UI. Retrieving this property is a constant‑time operation because
+  /// its value is cached; each text mutation automatically recomputes it.
+  String get visibleText => _visibleText;
+
+  /// Returns true if [sourceText] (or the controller's current `text` if
+  /// omitted) contains at least one recognised taggable according to the
+  /// controller's `tagStyles` and internal tag mapping.
+  bool containsTaggable([String? sourceText]) {
+    final checkText = sourceText ?? text;
+    for (final match in _getTagMatches(checkText)) {
+      if (_parseTagString(match.group(0)!) != null) return true;
+    }
+    return false;
+  }
+
   /// Returns all matching tags in the text based on the tag styles.
   Iterable<Match> _getTagMatches(String text) {
-    final pattern = tagStyles
+    final taggableStyles = tagStyles.where((style) => style.isTaggable);
+    final pattern = taggableStyles
         .map((style) =>
             '${RegExp.escape(style.prefix)}$spaceMarker*(${style.regExp})')
         .join('|');
@@ -113,7 +147,8 @@ class TagTextEditingController<T> extends TextEditingController {
       position = match.end;
 
       final tagStyle = tagStyles
-          .where((style) => match.group(0)!.startsWith(style.prefix))
+          .where((style) =>
+              style.isTaggable && match.group(0)!.startsWith(style.prefix))
           .firstOrNull;
       if (tagStyle == null) {
         tmpText.write(match.group(0));
@@ -147,7 +182,8 @@ class TagTextEditingController<T> extends TextEditingController {
   /// Parses a tag string (e.g. "@tag") and returns a tag object.
   Tag<T>? _parseTagString(String tagString) {
     final tagStyle = tagStyles
-        .where((style) => tagString.startsWith(style.prefix))
+        .where(
+            (style) => style.isTaggable && tagString.startsWith(style.prefix))
         .firstOrNull;
     final taggable = _tagBackendFormatsToTaggables[tagString];
     if (tagStyle == null || taggable == null) return null;
@@ -305,7 +341,10 @@ class TagTextEditingController<T> extends TextEditingController {
     if (currentPos == -1) return null;
     // Get the last position of a tag prefix before the cursor
     int tagStartPosition = text.substring(0, currentPos).lastIndexOf(
-          RegExp(tagStyles.map((style) => style.prefix).join('|')),
+          RegExp(tagStyles
+              .where((style) => style.isTaggable)
+              .map((style) => style.prefix)
+              .join('|')),
         );
     if (tagStartPosition == -1) {
       return null;
@@ -401,7 +440,9 @@ class TagTextEditingController<T> extends TextEditingController {
   /// Insertion typically replaces any tag prompt with the taggable. The number
   /// of characters to replace is given by [charactersToReplace].
   void insertTaggable(String prefix, T taggable, int charactersToReplace) {
-    final tagStyle = tagStyles.where((style) => prefix == style.prefix).first;
+    final tagStyle = tagStyles
+        .where((style) => style.isTaggable && prefix == style.prefix)
+        .first;
     final tag = Tag<T>(taggable: taggable, style: tagStyle);
     final tagText = tag.toModifiedString(
       toFrontendConverter,
@@ -423,5 +464,32 @@ class TagTextEditingController<T> extends TextEditingController {
   /// Updates the previous cursor position. This is used for intuitive cursor movement.
   void _updatePreviousCursorPosition() {
     _previousCursorPosition = selection.baseOffset;
+  }
+
+  /// Recalculates [_visibleText] based on the current [text].
+  /// This is intentionally a full recomputation; since it runs only when the
+  /// controller's value changes, it is cheap in the common case and allows
+  /// `visibleText` to be read without any extra work later.
+  void _updateVisibleText() {
+    _visibleText = _computeVisibleText(text);
+  }
+
+  /// Internal helper used by [_updateVisibleText] to produce the visible
+  /// string from the raw controller text.
+  String _computeVisibleText(String raw) {
+    String result = raw;
+    final matches = _getTagMatches(result).toList().reversed;
+    for (final match in matches) {
+      final original = match.group(0)!;
+      final tag = _parseTagString(original);
+      if (tag == null) continue;
+      final frontend = tag.toModifiedString(
+        toFrontendConverter,
+        toBackendConverter,
+        isFrontend: true,
+      );
+      result = result.replaceRange(match.start, match.end, frontend);
+    }
+    return result.replaceAll(spaceMarker, '');
   }
 }

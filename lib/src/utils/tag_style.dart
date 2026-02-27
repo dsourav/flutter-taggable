@@ -1,8 +1,12 @@
+import 'package:flutter/material.dart';
+
 /// A class that represents a distinct way of styling tags.
 class TagStyle {
   const TagStyle({
     this.prefix = '@',
     this.regExp = r'[a-zA-Z0-9]+',
+    this.isTaggable = true,
+    this.style,
   });
 
   /// The prefix that identifies the tag, e.g. '@' in '@tag'. Defaults to '@'.
@@ -25,4 +29,11 @@ class TagStyle {
   ///
   /// The regular expression should not contain the prefix.
   final String regExp;
+
+  /// Whether this tag style represents taggable items that can be selected and inserted.
+  /// If false, the matched text will be styled with [style] but no tagging behavior.
+  final bool isTaggable;
+
+  /// The text style to apply to the matched text when [isTaggable] is false.
+  final TextStyle? style;
 }

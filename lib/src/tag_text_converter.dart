@@ -44,6 +44,8 @@ Future<List<InlineSpan>> convertTagTextToInlineSpans<T>(
       backendToTaggable,
   required InlineSpan Function(T taggable, TagStyle tagStyle)
       taggableToInlineSpan,
+  InlineSpan Function(String matchedText, TagStyle tagStyle)?
+      nonTaggableToInlineSpan,
 }) async {
   final pattern = tagStyles
       .map((style) => '${RegExp.escape(style.prefix)}(${style.regExp})')
@@ -59,15 +61,24 @@ Future<List<InlineSpan>> convertTagTextToInlineSpans<T>(
     final tagStyle = tagStyles.firstWhere(
       (style) => match.group(0)!.startsWith(style.prefix),
     );
-    final taggable = await backendToTaggable(
-      tagStyle.prefix,
-      match.group(0)!.substring(tagStyle.prefix.length),
-    );
 
-    if (taggable != null) {
-      spans.add(taggableToInlineSpan(taggable, tagStyle));
+    if (tagStyle.isTaggable) {
+      final taggable = await backendToTaggable(
+        tagStyle.prefix,
+        match.group(0)!.substring(tagStyle.prefix.length),
+      );
+
+      if (taggable != null) {
+        spans.add(taggableToInlineSpan(taggable, tagStyle));
+      } else {
+        spans.add(TextSpan(text: match.group(0)));
+      }
     } else {
-      spans.add(TextSpan(text: match.group(0)));
+      if (nonTaggableToInlineSpan != null) {
+        spans.add(nonTaggableToInlineSpan(match.group(0)!, tagStyle));
+      } else {
+        spans.add(TextSpan(text: match.group(0), style: tagStyle.style));
+      }
     }
   }
   if (text.substring(position).isNotEmpty) {
