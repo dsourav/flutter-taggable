@@ -136,10 +136,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// This method is used to build the [InlineSpan]s from the backend format.
-  FutureOr<List<InlineSpan>> _buildTextSpans(
+  List<InlineSpan> _buildTextSpans(
     String backendFormat,
     BuildContext context,
-  ) async {
+  ) {
     return convertTagTextToInlineSpans<Taggable>(
       backendFormat,
       tagStyles: _controller.tagStyles,
@@ -248,7 +248,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   /// This method converts the backend format to the taggable object.
-  FutureOr<Taggable?> backendToTaggable(String prefix, String id) {
+  Taggable? backendToTaggable(String prefix, String id) {
     return switch (prefix) {
       '@' => users.where((user) => user.id == id).firstOrNull,
       '#' => topics.where((topic) => topic.id == id).firstOrNull,

@@ -37,16 +37,15 @@ import 'utils/tag_style.dart';
 ///   },
 /// );
 /// ```
-Future<List<InlineSpan>> convertTagTextToInlineSpans<T>(
+List<InlineSpan> convertTagTextToInlineSpans<T>(
   String text, {
   required List<TagStyle> tagStyles,
-  required FutureOr<T?> Function(String prefix, String backendString)
-      backendToTaggable,
+  required T? Function(String prefix, String backendString) backendToTaggable,
   required InlineSpan Function(T taggable, TagStyle tagStyle)
       taggableToInlineSpan,
   InlineSpan Function(String matchedText, TagStyle tagStyle)?
       nonTaggableToInlineSpan,
-}) async {
+}) {
   final pattern = tagStyles
       .map((style) => '${RegExp.escape(style.prefix)}(${style.regExp})')
       .join('|');
@@ -55,7 +54,7 @@ Future<List<InlineSpan>> convertTagTextToInlineSpans<T>(
 
   for (final match in RegExp(pattern).allMatches(text)) {
     final textBeforeTag = text.substring(position, match.start);
-    spans.add(TextSpan(text: textBeforeTag));
+    if (textBeforeTag.isNotEmpty) spans.add(TextSpan(text: textBeforeTag));
     position = match.end;
 
     final tagStyle = tagStyles.firstWhere(
@@ -63,7 +62,7 @@ Future<List<InlineSpan>> convertTagTextToInlineSpans<T>(
     );
 
     if (tagStyle.isTaggable) {
-      final taggable = await backendToTaggable(
+      final taggable = backendToTaggable(
         tagStyle.prefix,
         match.group(0)!.substring(tagStyle.prefix.length),
       );
@@ -81,8 +80,8 @@ Future<List<InlineSpan>> convertTagTextToInlineSpans<T>(
       }
     }
   }
-  if (text.substring(position).isNotEmpty) {
-    spans.add(TextSpan(text: text.substring(position)));
-  }
+
+  final tail = text.substring(position);
+  if (tail.isNotEmpty) spans.add(TextSpan(text: tail));
   return spans;
 }
