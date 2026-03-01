@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 import 'utils/tag_style.dart';
 
@@ -45,6 +46,8 @@ List<InlineSpan> convertTagTextToInlineSpans<T>(
       taggableToInlineSpan,
   InlineSpan Function(String matchedText, TagStyle tagStyle)?
       nonTaggableToInlineSpan,
+  TextStyle? linkStyle,
+  void Function(String url)? onLinkTap,
 }) {
   final pattern = tagStyles
       .map((style) => '${RegExp.escape(style.prefix)}(${style.regExp})')
@@ -52,9 +55,36 @@ List<InlineSpan> convertTagTextToInlineSpans<T>(
   final spans = <InlineSpan>[];
   int position = 0;
 
+  List<InlineSpan> textWithLinks(String plainText, {TextStyle? baseStyle}) {
+    final urlRegex = RegExp(r'((https?:\/\/|www\.)\S+)');
+    final parts = <InlineSpan>[];
+    int last = 0;
+    for (final m in urlRegex.allMatches(plainText)) {
+      if (m.start > last) {
+        parts.add(TextSpan(
+            text: plainText.substring(last, m.start), style: baseStyle));
+      }
+      final urlText = m.group(0)!;
+      final effectiveLinkStyle =
+          (linkStyle ?? const TextStyle(color: Colors.blue))
+              .merge(const TextStyle(decoration: TextDecoration.underline));
+      parts.add(TextSpan(
+        text: urlText,
+        style: effectiveLinkStyle,
+        recognizer: TapGestureRecognizer()
+          ..onTap = () => onLinkTap?.call(urlText),
+      ));
+      last = m.end;
+    }
+    if (last < plainText.length) {
+      parts.add(TextSpan(text: plainText.substring(last), style: baseStyle));
+    }
+    return parts;
+  }
+
   for (final match in RegExp(pattern).allMatches(text)) {
     final textBeforeTag = text.substring(position, match.start);
-    if (textBeforeTag.isNotEmpty) spans.add(TextSpan(text: textBeforeTag));
+    if (textBeforeTag.isNotEmpty) spans.addAll(textWithLinks(textBeforeTag));
     position = match.end;
 
     final tagStyle = tagStyles.firstWhere(
@@ -76,12 +106,12 @@ List<InlineSpan> convertTagTextToInlineSpans<T>(
       if (nonTaggableToInlineSpan != null) {
         spans.add(nonTaggableToInlineSpan(match.group(0)!, tagStyle));
       } else {
-        spans.add(TextSpan(text: match.group(0), style: tagStyle.style));
+        spans.addAll(textWithLinks(match.group(0)!, baseStyle: tagStyle.style));
       }
     }
   }
 
   final tail = text.substring(position);
-  if (tail.isNotEmpty) spans.add(TextSpan(text: tail));
+  if (tail.isNotEmpty) spans.addAll(textWithLinks(tail));
   return spans;
 }

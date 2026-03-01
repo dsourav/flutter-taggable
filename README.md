@@ -23,6 +23,10 @@ However, any taggable entity typically has a unique identifier, such as a user I
 - **Customizable search**: Specify how the package should search for tags, as well as how the options should be displayed.
 - **Type annotations**: Give a type to the `TagTextEditingController` for better type safety and code completion when you define your callbacks.
 - **Efficient text access**: the controller now maintains a cached `visibleText` string that mirrors what the user actually sees. Reading this property is an O(1) operation, and the value is updated automatically on every change, so you don't need to re‑run regexes or conversions yourself.
+- **Link detection**: when you later convert backend text into `InlineSpan`s using
+  `convertTagTextToInlineSpans`, any URL-like substring will automatically be
+  turned into an underlined, tappable link. You can provide a custom
+  `linkStyle` and an `onLinkTap` callback to control appearance and behaviour.
 
 ## Getting started
 
@@ -180,6 +184,23 @@ FutureOr<T?> Function(String prefix, String backendString) backendToTaggable
 ```
 
 3. **Displaying tags outside the text field**: Typically, content created with the `TagTextEditingController` will be displayed in a different widget, such as a comment section or chat thread. This package exposes a method `convertTagTextToInlineSpans` that converts the text with tags to a list of `InlineSpan` objects. The example shows how to use this method to display the text with tags in a `RichText` widget. While it covers most use cases, you may want to define your own conversion method for more complex scenarios.
+
+```dart
+final spans = convertTagTextToInlineSpans(
+  backendFormat,
+  tagStyles: myController.tagStyles,
+  backendToTaggable: backendToTaggable,
+  taggableToInlineSpan: (taggable, style) => TextSpan(
+        text: '${style.prefix}${taggable.name}',
+        style: style.textStyle,
+      ),
+  // optional link customization:
+  linkStyle: TextStyle(color: Colors.blue),
+  onLinkTap: (url) => debugPrint('clicked $url'),
+);
+
+// then display with Text.rich(TextSpan(children: spans));
+```
 
 ## Additional information
 

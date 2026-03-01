@@ -105,6 +105,17 @@ class _HomePageState extends State<HomePage> {
     // Add a listener to update the [backendFormat] when the text changes.
     _controller.addListener(
         () => setState(() => backendFormat = _controller.textInBackendFormat));
+
+    // add an initial comment demonstrating both tags and a clickable link
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final initial = _buildTextSpans(
+        'Welcome @Alice! Visit https://flutter.dev for docs and try #Flutter',
+        context,
+      );
+      setState(() {
+        comments.add(initial);
+      });
+    });
   }
 
   @override
@@ -159,6 +170,12 @@ class _HomePageState extends State<HomePage> {
                 ),
         );
       },
+      linkStyle: TextStyle(
+        color: Theme.of(context).colorScheme.primary,
+      ),
+      onLinkTap: (url) => ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Tapped link: $url')),
+      ),
     );
   }
 
